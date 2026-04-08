@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getLeads, addLead } from '@/lib/store'
+import { fetchAnalyzedLeads, updateContactCustomFields } from '@/lib/store'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -15,10 +15,18 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     const items: unknown[] = Array.isArray(body) ? body : [body]
-    const created: string[] = []
+    const updated: string[] = []
 
     for (const item of items) {
       const r = item as Record<string, unknown>
+
+      // contact_id is required to update a GHL contact
+      if (!r.contact_id) {
+        return NextResponse.json(
+          { error: 'Missing required field: contact_id' },
+          { status: 400, headers: corsHeaders },
+        )
+      }
 
       const required = ['urgency_level', 'sentiment_score', 'problem_description', 'bottlenecks', 'fears', 'desires', 'lead_summary']
       const missing = required.filter(f => r[f] === undefined || r[f] === null)
@@ -41,7 +49,8 @@ export async function POST(request: NextRequest) {
       const validReadiness = ['Done-For-You', 'DIY', 'Hybrid']
       const market_readiness = (validReadiness.includes(rawReadiness) ? rawReadiness : 'Hybrid') as 'Done-For-You' | 'DIY' | 'Hybrid'
 
-      const lead = addLead({
+      const contactId = String(r.contact_id)
+      const result = await updateContactCustomFields(contactId, {
         urgency_level: urgency as 'Hot' | 'Warm' | 'Cold',
         sentiment_score: Number(r.sentiment_score),
         problem_description: String(r.problem_description || ''),
@@ -49,9 +58,6 @@ export async function POST(request: NextRequest) {
         fears: String(r.fears || ''),
         desires: String(r.desires || ''),
         lead_summary: String(r.lead_summary || ''),
-        timestamp: String(r.timestamp || new Date().toISOString()),
-        name: String(r.name || 'Anonymous'),
-        email: String(r.email || ''),
         market_readiness,
         past_investment: String(r.past_investment || ''),
         tried_before: String(r.tried_before || ''),
@@ -60,12 +66,20 @@ export async function POST(request: NextRequest) {
         service_preference: String(r.service_preference || ''),
         key_phrase: String(r.key_phrase || ''),
       })
-      created.push(lead.id)
+
+      if (!result.success) {
+        return NextResponse.json(
+          { error: result.error },
+          { status: 502, headers: corsHeaders },
+        )
+      }
+
+      updated.push(contactId)
     }
 
     return NextResponse.json(
-      { success: true, count: created.length, ids: created },
-      { status: 201, headers: corsHeaders },
+      { success: true, count: updated.length, contact_ids: updated },
+      { status: 200, headers: corsHeaders },
     )
   } catch {
     return NextResponse.json(
@@ -76,5 +90,13 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET() {
-  return NextResponse.json({ leads: getLeads() }, { headers: corsHeaders })
+  try {
+    const leads = await fetchAnalyzedLeads()
+    return NextResponse.json({ leads }, { headers: corsHeaders })
+  } catch {
+    return NextResponse.json(
+      { error: 'Failed to fetch leads from GHL' },
+      { status: 502, headers: corsHeaders },
+    )
+  }
 }
