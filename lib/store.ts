@@ -108,18 +108,28 @@ export async function fetchAnalyzedLeads(): Promise<Lead[]> {
       params.set('startAfter', startAfter)
     }
 
-    const res = await fetch(
-      `https://services.leadconnectorhq.com/contacts/?${params.toString()}`,
-      {
-        method: 'GET',
-        headers: ghlHeaders(),
-      }
-    )
+    let res: Response | null = null
+    for (let attempt = 0; attempt < 3; attempt++) {
+      res = await fetch(
+        `https://services.leadconnectorhq.com/contacts/?${params.toString()}`,
+        {
+          method: 'GET',
+          headers: ghlHeaders(),
+        }
+      )
 
-    if (!res.ok) {
-      const errBody = await res.text()
-      console.error(`[store] GHL contacts error ${res.status}: ${errBody}`)
-      throw new Error(`GHL API error ${res.status}: ${errBody}`)
+      if (res.status === 429) {
+        console.warn(`[store] Rate limited, retrying in ${3 * (attempt + 1)}s...`)
+        await new Promise(resolve => setTimeout(resolve, 3000 * (attempt + 1)))
+        continue
+      }
+      break
+    }
+
+    if (!res || !res.ok) {
+      const errBody = await res?.text() ?? 'No response'
+      console.error(`[store] GHL contacts error ${res?.status}: ${errBody}`)
+      throw new Error(`GHL API error ${res?.status}: ${errBody}`)
     }
 
     const data = await res.json()
@@ -136,7 +146,7 @@ export async function fetchAnalyzedLeads(): Promise<Lead[]> {
       startAfterId = data.meta.startAfterId
       startAfter = String(data.meta.startAfter)
       // Respect GHL rate limits
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      await new Promise(resolve => setTimeout(resolve, 2000))
     } else {
       hasMore = false
     }
