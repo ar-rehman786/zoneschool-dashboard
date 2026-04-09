@@ -1,6 +1,6 @@
 # ZoneSchool Market Intelligence Dashboard
 
-Market Intelligence Agent dashboard for Zone School (Dr. Peter Goldman)
+Market Intelligence Agent dashboard for Zone School (Dr. Peter Goldman).
 Built for MBP Marketing by Auto Link.
 
 ## Quick Start
