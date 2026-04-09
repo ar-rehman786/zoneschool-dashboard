@@ -135,6 +135,8 @@ export async function fetchAnalyzedLeads(): Promise<Lead[]> {
     if (data.meta?.startAfterId && data.meta?.startAfter) {
       startAfterId = data.meta.startAfterId
       startAfter = String(data.meta.startAfter)
+      // Respect GHL rate limits
+      await new Promise(resolve => setTimeout(resolve, 1000))
     } else {
       hasMore = false
     }
