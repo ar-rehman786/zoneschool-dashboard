@@ -107,20 +107,8 @@ function contactToLead(contact: GHLContact): Lead {
   }
 }
 
-// ─── Server-side cache ───
-let cachedLeads: Lead[] = []
-let cacheTimestamp = 0
-const CACHE_TTL = 300_000 // 5 minutes
-
 // ─── Fetch analyzed contacts from GHL ───
 export async function fetchAnalyzedLeads(): Promise<Lead[]> {
-  const now = Date.now()
-  if (cachedLeads.length > 0 && now - cacheTimestamp < CACHE_TTL) {
-    const ageSec = Math.round((now - cacheTimestamp) / 1000)
-    console.log(`[store] Cache hit (${ageSec}s old), returning ${cachedLeads.length} leads`)
-    return cachedLeads
-  }
-
   const locationId = process.env.GHL_LOCATION_ID
   if (!locationId) {
     console.error('[store] GHL_LOCATION_ID is not set!')
@@ -132,73 +120,62 @@ export async function fetchAnalyzedLeads(): Promise<Lead[]> {
   let startAfterId = ''
   let startAfter = ''
 
-  try {
-    while (hasMore) {
-      const params = new URLSearchParams({
-        locationId,
-        limit: '100',
-        query: 'zs_analyzed',
-      })
+  while (hasMore) {
+    const params = new URLSearchParams({
+      locationId,
+      limit: '100',
+      query: 'zs_analyzed',
+    })
 
-      if (startAfterId && startAfter) {
-        params.set('startAfterId', startAfterId)
-        params.set('startAfter', startAfter)
-      }
+    if (startAfterId && startAfter) {
+      params.set('startAfterId', startAfterId)
+      params.set('startAfter', startAfter)
+    }
 
-      let res: Response | null = null
-      for (let attempt = 0; attempt < 3; attempt++) {
-        res = await fetch(
-          `https://services.leadconnectorhq.com/contacts/?${params.toString()}`,
-          {
-            method: 'GET',
-            headers: ghlHeaders(),
-          }
-        )
-
-        if (res.status === 429) {
-          const wait = 5000 * (attempt + 1)
-          console.warn(`[store] Rate limited, retrying in ${wait / 1000}s...`)
-          await new Promise(resolve => setTimeout(resolve, wait))
-          continue
+    let res: Response | null = null
+    for (let attempt = 0; attempt < 3; attempt++) {
+      res = await fetch(
+        `https://services.leadconnectorhq.com/contacts/?${params.toString()}`,
+        {
+          method: 'GET',
+          headers: ghlHeaders(),
         }
-        break
+      )
+
+      if (res.status === 429) {
+        const wait = 5000 * (attempt + 1)
+        console.warn(`[store] Rate limited, retrying in ${wait / 1000}s...`)
+        await new Promise(resolve => setTimeout(resolve, wait))
+        continue
       }
+      break
+    }
 
-      if (!res || !res.ok) {
-        const errBody = await res?.text() ?? 'No response'
-        console.error(`[store] GHL contacts error ${res?.status}: ${errBody}`)
-        throw new Error(`GHL API error ${res?.status}: ${errBody}`)
-      }
+    if (!res || !res.ok) {
+      const errBody = await res?.text() ?? 'No response'
+      console.error(`[store] GHL contacts error ${res?.status}: ${errBody}`)
+      throw new Error(`GHL API error ${res?.status}: ${errBody}`)
+    }
 
-      const data = await res.json()
-      const contacts: GHLContact[] = data.contacts || []
+    const data = await res.json()
+    const contacts: GHLContact[] = data.contacts || []
 
-      for (const contact of contacts) {
-        const urgencyVal = getCustomField(contact, 'zs_urgency_level')
-        if (urgencyVal) {
-          leads.push(contactToLead(contact))
-        }
-      }
-
-      if (data.meta?.startAfterId && data.meta?.startAfter) {
-        startAfterId = data.meta.startAfterId
-        startAfter = String(data.meta.startAfter)
-        await new Promise(resolve => setTimeout(resolve, 500))
-      } else {
-        hasMore = false
+    for (const contact of contacts) {
+      const urgencyVal = getCustomField(contact, 'zs_urgency_level')
+      if (urgencyVal) {
+        leads.push(contactToLead(contact))
       }
     }
-  } catch (err) {
-    if (cachedLeads.length > 0) {
-      const ageSec = Math.round((now - cacheTimestamp) / 1000)
-      console.warn(`[store] GHL fetch failed, returning stale cache (${ageSec}s old, ${cachedLeads.length} leads)`)
-      return cachedLeads
+
+    if (data.meta?.startAfterId && data.meta?.startAfter) {
+      startAfterId = data.meta.startAfterId
+      startAfter = String(data.meta.startAfter)
+      await new Promise(resolve => setTimeout(resolve, 500))
+    } else {
+      hasMore = false
     }
-    throw err
   }
 
-  cachedLeads = leads
-  cacheTimestamp = Date.now()
   console.log(`[store] Fetched ${leads.length} analyzed leads from GHL`)
   return leads
 }

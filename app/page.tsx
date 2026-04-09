@@ -851,7 +851,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchLeads()
-    const interval = setInterval(fetchLeads, 60_000)
+    const interval = setInterval(fetchLeads, 10_000)
     return () => clearInterval(interval)
   }, [fetchLeads])
 
