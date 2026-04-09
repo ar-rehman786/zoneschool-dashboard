@@ -109,7 +109,7 @@ export async function fetchAnalyzedLeads(): Promise<Lead[]> {
     }
 
     let res: Response | null = null
-    for (let attempt = 0; attempt < 3; attempt++) {
+    for (let attempt = 0; attempt < 5; attempt++) {
       res = await fetch(
         `https://services.leadconnectorhq.com/contacts/?${params.toString()}`,
         {
@@ -119,8 +119,9 @@ export async function fetchAnalyzedLeads(): Promise<Lead[]> {
       )
 
       if (res.status === 429) {
-        console.warn(`[store] Rate limited, retrying in ${3 * (attempt + 1)}s...`)
-        await new Promise(resolve => setTimeout(resolve, 3000 * (attempt + 1)))
+        const wait = 5000 * (attempt + 1)
+        console.warn(`[store] Rate limited, retrying in ${wait / 1000}s...`)
+        await new Promise(resolve => setTimeout(resolve, wait))
         continue
       }
       break
@@ -146,7 +147,7 @@ export async function fetchAnalyzedLeads(): Promise<Lead[]> {
       startAfterId = data.meta.startAfterId
       startAfter = String(data.meta.startAfter)
       // Respect GHL rate limits
-      await new Promise(resolve => setTimeout(resolve, 2000))
+      await new Promise(resolve => setTimeout(resolve, 3000))
     } else {
       hasMore = false
     }
