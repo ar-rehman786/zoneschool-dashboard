@@ -94,7 +94,7 @@ export async function fetchAnalyzedLeads(): Promise<Lead[]> {
   while (hasMore) {
     const params = new URLSearchParams({
       locationId,
-      limit: '100',
+      pageLimit: '100',
       page: String(page),
     })
 
