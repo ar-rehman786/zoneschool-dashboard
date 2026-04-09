@@ -92,15 +92,17 @@ export async function fetchAnalyzedLeads(): Promise<Lead[]> {
   let hasMore = true
 
   while (hasMore) {
-    const params = new URLSearchParams({
-      locationId,
-      pageLimit: '100',
-      page: String(page),
-    })
-
     const res = await fetch(
-      `https://services.leadconnectorhq.com/contacts/search?${params.toString()}`,
-      { method: 'GET', headers: ghlHeaders() },
+      'https://services.leadconnectorhq.com/contacts/search',
+      {
+        method: 'POST',
+        headers: ghlHeaders(),
+        body: JSON.stringify({
+          locationId,
+          pageLimit: 100,
+          page,
+        }),
+      },
     )
 
     if (!res.ok) {
