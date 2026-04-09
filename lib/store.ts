@@ -86,28 +86,39 @@ function contactToLead(contact: GHLContact): Lead {
 
 // ─── Fetch all analyzed contacts from GHL ───
 export async function fetchAnalyzedLeads(): Promise<Lead[]> {
-  const locationId = process.env.GHL_LOCATION_ID || ''
+  const locationId = process.env.GHL_LOCATION_ID
+  if (!locationId) {
+    console.error('[store] GHL_LOCATION_ID is not set!')
+    return []
+  }
+
   const leads: Lead[] = []
-  let page = 1
   let hasMore = true
+  let startAfterId = ''
+  let startAfter = ''
 
   while (hasMore) {
+    const params = new URLSearchParams({
+      locationId,
+      limit: '100',
+    })
+
+    if (startAfterId && startAfter) {
+      params.set('startAfterId', startAfterId)
+      params.set('startAfter', startAfter)
+    }
+
     const res = await fetch(
-      'https://services.leadconnectorhq.com/contacts/search',
+      `https://services.leadconnectorhq.com/contacts/?${params.toString()}`,
       {
-        method: 'POST',
+        method: 'GET',
         headers: ghlHeaders(),
-        body: JSON.stringify({
-          locationId,
-          pageLimit: 100,
-          page,
-        }),
-      },
+      }
     )
 
     if (!res.ok) {
       const errBody = await res.text()
-      console.error(`[store] GHL search error ${res.status}: ${errBody}`)
+      console.error(`[store] GHL contacts error ${res.status}: ${errBody}`)
       throw new Error(`GHL API error ${res.status}: ${errBody}`)
     }
 
@@ -121,10 +132,11 @@ export async function fetchAnalyzedLeads(): Promise<Lead[]> {
       }
     }
 
-    if (contacts.length < 100) {
-      hasMore = false
+    if (data.meta?.startAfterId && data.meta?.startAfter) {
+      startAfterId = data.meta.startAfterId
+      startAfter = String(data.meta.startAfter)
     } else {
-      page++
+      hasMore = false
     }
   }
 
