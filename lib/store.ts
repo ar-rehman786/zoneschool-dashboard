@@ -23,6 +23,9 @@ export interface Lead {
 // ─── GHL API helpers ───
 
 function ghlHeaders(): Record<string, string> {
+  if (!process.env.GHL_API_KEY) {
+    console.error('[store] GHL_API_KEY is not set!')
+  }
   return {
     Authorization: `Bearer ${process.env.GHL_API_KEY}`,
     'Content-Type': 'application/json',
@@ -47,9 +50,29 @@ interface GHLContact {
   dateAdded?: string
 }
 
-function getCustomField(contact: GHLContact, key: string): string {
+// ─── Custom field ID → key mapping ───
+const FIELD_ID_MAP: Record<string, string> = {
+  FFx9pmlXKO509QIZLX3q: 'zs_urgency_level',
+  mQBexawjuxSD6Phx37DG: 'zs_sentiment_score',
+  NpCmPq2yvEhJRLuW4m1g: 'zs_market_readiness',
+  dIVznv5E7na3CTjLDhyg: 'zs_problem_description',
+  OJ1UcOUAwO8hZTNHAnzq: 'zs_bottlenecks',
+  '0kRtaFAxeXXTWkF4kHf8': 'zs_fears',
+  moKpKEdaEJGgH3oEoAzB: 'zs_desires',
+  '7oaYwY5mxzLyxbGMpB1W': 'zs_past_investment',
+  aG4fVqXPvkY40tP41uAp: 'zs_tried_before',
+  qRcBEmTKGxCQiOR0kbOk: 'zs_success_definition',
+  '2dLiVC8Ni1F6KnAz6QXT': 'zs_identity_transformation',
+  '9aRLfosPBVwD2Z3L16Bn': 'zs_service_preference',
+  Yi0WAkOGsWizmQ6FgWiW: 'zs_lead_summary',
+  j76ocqY5Cts9FF6k6MoQ: 'zs_key_phrase',
+}
+
+function getCustomField(contact: GHLContact, fieldName: string): string {
   if (!contact.customFields) return ''
-  const cf = contact.customFields.find(f => f.key === key)
+  const fieldId = Object.entries(FIELD_ID_MAP).find(([, name]) => name === fieldName)?.[0]
+  if (!fieldId) return ''
+  const cf = contact.customFields.find(f => f.id === fieldId)
   return cf?.field_value ?? cf?.value ?? ''
 }
 
@@ -87,9 +110,9 @@ function contactToLead(contact: GHLContact): Lead {
 // ─── Server-side cache ───
 let cachedLeads: Lead[] = []
 let cacheTimestamp = 0
-const CACHE_TTL = 120_000 // 2 minutes
+const CACHE_TTL = 300_000 // 5 minutes
 
-// ─── Fetch all analyzed contacts from GHL ───
+// ─── Fetch analyzed contacts from GHL ───
 export async function fetchAnalyzedLeads(): Promise<Lead[]> {
   const now = Date.now()
   if (cachedLeads.length > 0 && now - cacheTimestamp < CACHE_TTL) {
@@ -114,6 +137,7 @@ export async function fetchAnalyzedLeads(): Promise<Lead[]> {
       const params = new URLSearchParams({
         locationId,
         limit: '100',
+        query: 'zs_analyzed',
       })
 
       if (startAfterId && startAfter) {
@@ -159,8 +183,7 @@ export async function fetchAnalyzedLeads(): Promise<Lead[]> {
       if (data.meta?.startAfterId && data.meta?.startAfter) {
         startAfterId = data.meta.startAfterId
         startAfter = String(data.meta.startAfter)
-        // Respect GHL rate limits
-        await new Promise(resolve => setTimeout(resolve, 1000))
+        await new Promise(resolve => setTimeout(resolve, 500))
       } else {
         hasMore = false
       }
