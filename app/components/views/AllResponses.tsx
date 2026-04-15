@@ -3,7 +3,7 @@
 import { useState, Fragment } from 'react'
 import type { Lead } from '@/lib/types'
 import { C } from '@/lib/constants'
-import { fmtDate } from '@/lib/helpers'
+import { fmtDate, isJunkLead } from '@/lib/helpers'
 import { Card } from '../ui/Card'
 import { SectionTitle } from '../ui/SectionTitle'
 import { UrgencyBadge } from '../ui/UrgencyBadge'
@@ -139,16 +139,22 @@ export function AllResponses({ leads }: { leads: Lead[] }) {
             {filtered.length === 0 ? (
               <tr><td colSpan={10} className="px-4 py-10 text-center" style={{ color: C.textMuted, fontFamily: C.fontBody }}>No respondents found.</td></tr>
             ) : (
-              filtered.map((lead, idx) => (
+              filtered.map((lead, idx) => {
+                const junk = isJunkLead(lead)
+                const rowBg = idx % 2 === 0 ? '#FFFFFF' : '#FAFAF8'
+                return (
                 <Fragment key={lead.id}>
                   <tr
                     onClick={() => setExpandedId(expandedId === lead.id ? null : lead.id)}
                     className="cursor-pointer transition-colors duration-200"
-                    style={{ borderBottom: `1px solid ${C.cardBorder}`, background: idx % 2 === 0 ? '#FFFFFF' : '#FAFAF8' }}
+                    style={{ borderBottom: `1px solid ${C.cardBorder}`, background: rowBg, opacity: junk ? 0.45 : 1 }}
                     onMouseEnter={e => { e.currentTarget.style.background = '#F5F5F2' }}
-                    onMouseLeave={e => { e.currentTarget.style.background = idx % 2 === 0 ? '#FFFFFF' : '#FAFAF8' }}
+                    onMouseLeave={e => { e.currentTarget.style.background = rowBg }}
                   >
-                    <td className="px-4 py-3 whitespace-nowrap" style={{ color: C.text, fontFamily: C.fontHeading, fontWeight: 600 }}>{lead.name}</td>
+                    <td className="px-4 py-3 whitespace-nowrap" style={{ color: C.text, fontFamily: C.fontHeading, fontWeight: 600 }}>
+                      {lead.name}
+                      {junk && <span className="ml-2 px-1.5 py-0.5 rounded text-xs" style={{ background: '#F1F5F9', color: C.textMuted, fontFamily: C.fontHeading, fontWeight: 500, fontSize: '10px' }}>TEST</span>}
+                    </td>
                     <td className="px-4 py-3" style={{ color: C.textMuted, fontFamily: C.fontBody, fontSize: '12px' }}>{lead.email || '\u2014'}</td>
                     <td className="px-4 py-3"><ClientBadge isClient={lead.is_active_client} /></td>
                     <td className="px-4 py-3"><UrgencyBadge level={lead.urgency_level} /></td>
@@ -228,7 +234,8 @@ export function AllResponses({ leads }: { leads: Lead[] }) {
                     </tr>
                   )}
                 </Fragment>
-              ))
+                )
+              })
             )}
           </tbody>
         </table>

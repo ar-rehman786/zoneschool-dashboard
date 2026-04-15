@@ -35,8 +35,39 @@ export function fmtDate(ts: string): string {
   catch { return ts }
 }
 
-const JUNK_PATTERNS = /not provided|n\/a|unknown|insufficient|unable to determine|none|i don'?t know/i
+const JUNK_PHRASE_PATTERN = /not provided|n\/a|unknown|insufficient|unable to determine|none|i don'?t know|no authentic data|no specific/i
 
 export function isJunkPhrase(text: string): boolean {
-  return JUNK_PATTERNS.test(text)
+  return JUNK_PHRASE_PATTERN.test(text)
+}
+
+const JUNK_NAME_PATTERNS = ['test', 'n/a', 'nbnbbn', 'abdulll', 'testtt', 'testft']
+
+export function isJunkLead(lead: Lead): boolean {
+  const nameLower = lead.name.toLowerCase().trim()
+  const emailLower = lead.email.toLowerCase().trim()
+
+  if (JUNK_NAME_PATTERNS.some(p => nameLower.includes(p))) return true
+  if (JUNK_NAME_PATTERNS.some(p => emailLower.includes(p))) return true
+
+  const substantiveFields = [lead.problem_description, lead.fears, lead.desires, lead.success_definition]
+  const allEmpty = substantiveFields.every(f =>
+    !f || f.toLowerCase().trim() === 'n/a' || f.toLowerCase().trim() === 'not provided' || f.trim() === ''
+  )
+  if (allEmpty) return true
+
+  return false
+}
+
+const VALID_IDENTITY_TAGS = new Set([
+  'helper', 'purpose-driven', 'growth', 'achievement', 'family-centered',
+  'practice-as-self', 'trusted guide', 'values-led', 'stewardship', 'legacy',
+])
+
+export function isValidIdentityTag(tag: string): boolean {
+  return VALID_IDENTITY_TAGS.has(tag.toLowerCase().trim())
+}
+
+export function wordCount(text: string): number {
+  return text.trim().split(/\s+/).filter(Boolean).length
 }

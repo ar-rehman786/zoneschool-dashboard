@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import type { Lead } from '@/lib/types'
 import { C } from '@/lib/constants'
+import { isJunkLead } from '@/lib/helpers'
 import { Card } from './components/ui/Card'
 import { Sidebar } from './components/Sidebar'
 import { Header } from './components/Header'
@@ -56,6 +57,8 @@ export default function Dashboard() {
     return () => clearInterval(interval)
   }, [fetchLeads])
 
+  const realLeads = useMemo(() => leads.filter(l => !isJunkLead(l)), [leads])
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: C.bg }}>
@@ -69,18 +72,18 @@ export default function Dashboard() {
 
   return (
     <div className="flex min-h-screen" style={{ background: C.bg, overflow: 'hidden' }}>
-      <Sidebar view={view} onView={setView} leads={leads} />
+      <Sidebar view={view} onView={setView} leads={realLeads} />
 
       <main className="flex-1 overflow-y-auto h-screen">
-        {leads.length === 0 ? (
+        {realLeads.length === 0 && leads.length === 0 ? (
           <EmptyState />
         ) : (
           <div className="p-6" key={view}>
             <Header lastUpdated={lastUpdated} />
 
-            {view === 'prospects' && <TopProspects leads={leads} />}
-            {view === 'intelligence' && <MarketIntelligence leads={leads} />}
-            {view === 'members' && <YourMembers leads={leads} />}
+            {view === 'prospects' && <TopProspects leads={realLeads} />}
+            {view === 'intelligence' && <MarketIntelligence leads={realLeads} />}
+            {view === 'members' && <YourMembers leads={realLeads} />}
             {view === 'all' && <AllResponses leads={leads} />}
           </div>
         )}

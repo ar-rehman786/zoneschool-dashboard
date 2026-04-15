@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import type { Lead } from '@/lib/types'
 import { C, DRIVE_COLORS } from '@/lib/constants'
 import { pct } from '@/lib/helpers'
@@ -31,13 +31,13 @@ function stanceRank(s: string): number {
 function urgencyColor(u: string): string {
   if (u === 'Hot') return C.hot
   if (u === 'Warm') return C.warm
-  return C.cold
+  return '#94A3B8'
 }
 
 /* Circular gauge arc for stat cards */
 function GaugeArc({ value, max = 10, size = 56 }: { value: number; max?: number; size?: number }) {
   const radius = (size - 8) / 2
-  const circumference = Math.PI * radius // half circle
+  const circumference = Math.PI * radius
   const progress = (value / max) * circumference
   const color = value >= 7 ? C.hot : value >= 4 ? C.warm : C.cold
   return (
@@ -60,9 +60,31 @@ function GaugeArc({ value, max = 10, size = 56 }: { value: number; max?: number;
   )
 }
 
+interface ChartDatum {
+  name: string
+  fullName: string
+  score: number
+  urgency: string
+  fill: string
+  id: string
+}
+
+function CustomTooltip({ active, payload }: { active?: boolean; payload?: Array<{ payload: ChartDatum }> }) {
+  if (!active || !payload || !payload[0]) return null
+  const d = payload[0].payload
+  return (
+    <div className="rounded-xl p-3" style={{ background: '#FFFFFF', border: `1px solid ${C.cardBorder}`, boxShadow: C.cardShadow }}>
+      <p style={{ fontFamily: C.fontHeading, fontWeight: 600, fontSize: '13px', color: C.text }}>{d.fullName}</p>
+      <p style={{ fontFamily: C.fontBody, fontSize: '12px', color: C.body }}>Sentiment: {d.score}/10</p>
+      <p style={{ fontFamily: C.fontBody, fontSize: '12px', color: d.fill }}>{d.urgency}</p>
+    </div>
+  )
+}
+
 export function TopProspects({ leads }: { leads: Lead[] }) {
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [showLegend, setShowLegend] = useState(false)
+  const cardRefs = useRef<Record<string, HTMLDivElement | null>>({})
 
   const prospects = leads
     .filter(l => !l.is_active_client)
@@ -73,6 +95,15 @@ export function TopProspects({ leads }: { leads: Lead[] }) {
       if (sDiff !== 0) return sDiff
       return stanceRank(a.stance) - stanceRank(b.stance)
     })
+
+  const handleBarClick = useCallback((data: ChartDatum) => {
+    const el = cardRefs.current[data.id]
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      el.style.boxShadow = '0 0 0 2px #D8C07A, 0 2px 6px rgba(30,36,48,0.06), 0 12px 32px rgba(30,36,48,0.1)'
+      setTimeout(() => { el.style.boxShadow = C.cardShadow }, 1500)
+    }
+  }, [])
 
   if (prospects.length === 0) {
     return (
@@ -94,17 +125,17 @@ export function TopProspects({ leads }: { leads: Lead[] }) {
   const hotCount = prospects.filter(l => l.urgency_level === 'Hot').length
   const avgSentiment = prospects.length > 0 ? prospects.reduce((s, l) => s + l.sentiment_score, 0) / prospects.length : 0
 
-  // Top drive type
   const driveCounts: Record<string, number> = {}
   prospects.forEach(l => { driveCounts[l.drive_type] = (driveCounts[l.drive_type] || 0) + 1 })
   const topDrive = Object.entries(driveCounts).sort((a, b) => b[1] - a[1])[0]
 
-  // Lead landscape chart data
-  const chartData = prospects.slice(0, 15).map(l => ({
+  const chartData: ChartDatum[] = prospects.slice(0, 15).map(l => ({
     name: l.name.length > 18 ? l.name.slice(0, 16) + '...' : l.name,
+    fullName: l.name,
     score: l.sentiment_score,
     urgency: l.urgency_level,
     fill: urgencyColor(l.urgency_level),
+    id: l.id,
   }))
 
   return (
@@ -141,19 +172,15 @@ export function TopProspects({ leads }: { leads: Lead[] }) {
       {/* Lead Landscape chart */}
       <Card className="mb-6">
         <SectionTitle>Lead Landscape</SectionTitle>
-        <p className="mb-4" style={{ fontSize: '13px', color: C.textMuted, fontFamily: C.fontBody, marginTop: '-12px' }}>Each bar = sentiment score, color = urgency level</p>
-        <div style={{ height: Math.min(prospects.length * 36 + 20, 300), overflowY: prospects.length > 8 ? 'auto' : 'visible' }}>
-          <div style={{ height: Math.max(prospects.slice(0, 15).length * 36 + 20, 120) }}>
+        <p className="mb-4" style={{ fontSize: '13px', color: C.textMuted, fontFamily: C.fontBody, marginTop: '-12px' }}>Click a bar to jump to that prospect&apos;s card</p>
+        <div style={{ height: Math.min(chartData.length * 36 + 20, 300), overflowY: chartData.length > 8 ? 'auto' : 'visible' }}>
+          <div style={{ height: Math.max(chartData.length * 36 + 20, 120) }}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartData} layout="vertical" barSize={20} margin={{ left: 10, right: 20, top: 0, bottom: 0 }}>
                 <XAxis type="number" domain={[0, 10]} tick={{ fontSize: 11, fill: C.textMuted, fontFamily: 'Questrial' }} axisLine={false} tickLine={false} />
                 <YAxis type="category" dataKey="name" tick={{ fontSize: 12, fill: C.text, fontFamily: 'Questrial' }} axisLine={false} tickLine={false} width={130} />
-                <Tooltip
-                  contentStyle={{ background: '#FFFFFF', border: `1px solid ${C.cardBorder}`, borderRadius: '12px', fontFamily: 'Questrial', fontSize: '13px', boxShadow: C.cardShadow }}
-                  cursor={{ fill: 'rgba(30,36,48,0.03)' }}
-                  formatter={(v: number, _: string, p: { payload?: { urgency?: string } }) => [`${v}/10 sentiment`, p?.payload?.urgency ?? '']}
-                />
-                <Bar dataKey="score" radius={[0, 6, 6, 0]}>
+                <Tooltip content={<CustomTooltip />} />
+                <Bar dataKey="score" radius={[0, 6, 6, 0]} cursor="pointer" onClick={(_: unknown, index: number) => { if (chartData[index]) handleBarClick(chartData[index]) }}>
                   {chartData.map((d, i) => <Cell key={i} fill={d.fill} />)}
                 </Bar>
               </BarChart>
@@ -223,6 +250,7 @@ export function TopProspects({ leads }: { leads: Lead[] }) {
           return (
             <div
               key={lead.id}
+              ref={el => { cardRefs.current[lead.id] = el }}
               className="bg-white rounded-[20px] p-6 transition-all duration-200 hover:-translate-y-0.5"
               style={{
                 border: `1px solid ${C.cardBorder}`,

@@ -19,11 +19,12 @@ export function Sidebar({ view, onView, leads }: { view: string; onView: (v: Vie
         className="w-full text-left px-4 py-2.5 text-sm transition-all duration-200 flex items-center justify-between"
         style={{
           fontFamily: C.fontHeading,
-          fontWeight: 500,
+          fontWeight: isActive ? 600 : 500,
           borderRadius: '8px',
           borderLeft: isActive ? `3px solid ${C.sidebarActive}` : '3px solid transparent',
-          background: isActive ? 'rgba(216,192,122,0.08)' : 'transparent',
+          background: isActive ? 'rgba(216,192,122,0.12)' : 'transparent',
           color: isActive ? '#FFFFFF' : C.sidebarText,
+          transition: 'all 200ms ease',
         }}
         onMouseEnter={e => { if (!isActive) { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; e.currentTarget.style.color = '#FFFFFF' } }}
         onMouseLeave={e => { if (!isActive) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = C.sidebarText } }}
