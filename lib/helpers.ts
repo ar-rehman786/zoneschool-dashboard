@@ -34,3 +34,9 @@ export function fmtDate(ts: string): string {
   try { return new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) }
   catch { return ts }
 }
+
+const JUNK_PATTERNS = /not provided|n\/a|unknown|insufficient|unable to determine|none|i don'?t know/i
+
+export function isJunkPhrase(text: string): boolean {
+  return JUNK_PATTERNS.test(text)
+}
