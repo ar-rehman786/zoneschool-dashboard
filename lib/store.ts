@@ -1,24 +1,7 @@
-// ─── Lead type matching the dashboard interface ───
-export interface Lead {
-  id: string
-  urgency_level: 'Hot' | 'Warm' | 'Cold'
-  sentiment_score: number
-  problem_description: string
-  bottlenecks: string
-  fears: string
-  desires: string
-  lead_summary: string
-  timestamp: string
-  name: string
-  email: string
-  market_readiness: 'Done-For-You' | 'DIY' | 'Hybrid'
-  past_investment: string
-  tried_before: string
-  success_definition: string
-  identity_transformation: string
-  service_preference: string
-  key_phrase: string
-}
+import type { Lead } from './types'
+
+// Re-export Lead type for convenience
+export type { Lead } from './types'
 
 // ─── GHL API helpers ───
 
@@ -37,7 +20,7 @@ interface GHLCustomField {
   id: string
   key?: string
   field_value?: string
-  value?: string
+  value?: string | string[]
 }
 
 interface GHLContact {
@@ -54,7 +37,6 @@ interface GHLContact {
 const FIELD_ID_MAP: Record<string, string> = {
   FFx9pmlXKO509QIZLX3q: 'zs_urgency_level',
   mQBexawjuxSD6Phx37DG: 'zs_sentiment_score',
-  NpCmPq2yvEhJRLuW4m1g: 'zs_market_readiness',
   dIVznv5E7na3CTjLDhyg: 'zs_problem_description',
   OJ1UcOUAwO8hZTNHAnzq: 'zs_bottlenecks',
   '0kRtaFAxeXXTWkF4kHf8': 'zs_fears',
@@ -66,6 +48,13 @@ const FIELD_ID_MAP: Record<string, string> = {
   '9aRLfosPBVwD2Z3L16Bn': 'zs_service_preference',
   Yi0WAkOGsWizmQ6FgWiW: 'zs_lead_summary',
   j76ocqY5Cts9FF6k6MoQ: 'zs_key_phrase',
+  ptqW3lxZg0tlkWP44RVM: 'zs_analyzed_at',
+  bWxcEa3LNlMDbAK7kAKe: 'zs_stance',
+  '5Yjo23EVaoHR6EQyPezI': 'zs_drive_type',
+  pp3L3t5O8Dc9n7MRBPvT: 'zs_core_motivation',
+  '2J85rxxArGDf1Z1g4tBf': 'zs_identity_tags',
+  gyl7TxhO5UAWwTDqDqUb: 'zs_sales_strategy',
+  gxqcLxEKUwiKNxosVodF: 'is_active_client',
 }
 
 function getCustomField(contact: GHLContact, fieldName: string): string {
@@ -73,7 +62,9 @@ function getCustomField(contact: GHLContact, fieldName: string): string {
   const fieldId = Object.entries(FIELD_ID_MAP).find(([, name]) => name === fieldName)?.[0]
   if (!fieldId) return ''
   const cf = contact.customFields.find(f => f.id === fieldId)
-  return cf?.field_value ?? cf?.value ?? ''
+  const raw = cf?.field_value ?? cf?.value ?? ''
+  if (Array.isArray(raw)) return raw.join(', ')
+  return raw
 }
 
 function contactToLead(contact: GHLContact): Lead {
@@ -82,8 +73,20 @@ function contactToLead(contact: GHLContact): Lead {
   const urgencyRaw = getCustomField(contact, 'zs_urgency_level')
   const urgency = (['Hot', 'Warm', 'Cold'].includes(urgencyRaw) ? urgencyRaw : 'Cold') as Lead['urgency_level']
 
-  const readinessRaw = getCustomField(contact, 'zs_market_readiness')
-  const readiness = (['Done-For-You', 'DIY', 'Hybrid'].includes(readinessRaw) ? readinessRaw : 'Hybrid') as Lead['market_readiness']
+  const activeRaw = getCustomField(contact, 'is_active_client')
+  const is_active_client = activeRaw.toUpperCase().includes('YES')
+
+  const stanceRaw = getCustomField(contact, 'zs_stance')
+  const stance = (['Committed', 'Skeptical', 'Burned'].includes(stanceRaw) ? stanceRaw : 'Committed') as Lead['stance']
+
+  const driveRaw = getCustomField(contact, 'zs_drive_type')
+  const drive_type = (['Healer', 'Builder', 'Teacher'].includes(driveRaw) ? driveRaw : 'Healer') as Lead['drive_type']
+
+  const motivationRaw = getCustomField(contact, 'zs_core_motivation')
+  const core_motivation = (['Patient Results', 'Practice Growth', 'Personal Mastery'].includes(motivationRaw) ? motivationRaw : 'Patient Results') as Lead['core_motivation']
+
+  const tagsRaw = getCustomField(contact, 'zs_identity_tags')
+  const identity_tags = tagsRaw ? tagsRaw.split(',').map(t => t.trim()).filter(Boolean) : []
 
   return {
     id: contact.id,
@@ -91,7 +94,6 @@ function contactToLead(contact: GHLContact): Lead {
     email: contact.email || '',
     urgency_level: urgency,
     sentiment_score: Number(getCustomField(contact, 'zs_sentiment_score')) || 0,
-    market_readiness: readiness,
     problem_description: getCustomField(contact, 'zs_problem_description'),
     bottlenecks: getCustomField(contact, 'zs_bottlenecks'),
     fears: getCustomField(contact, 'zs_fears'),
@@ -104,6 +106,12 @@ function contactToLead(contact: GHLContact): Lead {
     lead_summary: getCustomField(contact, 'zs_lead_summary'),
     key_phrase: getCustomField(contact, 'zs_key_phrase'),
     timestamp: contact.dateAdded || new Date().toISOString(),
+    is_active_client,
+    stance,
+    drive_type,
+    core_motivation,
+    identity_tags,
+    sales_strategy: getCustomField(contact, 'zs_sales_strategy'),
   }
 }
 
