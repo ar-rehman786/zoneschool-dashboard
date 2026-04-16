@@ -1,12 +1,4 @@
 export const C = {
-  bg: '#FAFAF8',
-  card: '#FFFFFF',
-  cardBorder: 'rgba(30,36,48,0.06)',
-  cardShadow: '0 1px 3px rgba(30,36,48,0.04), 0 8px 24px rgba(30,36,48,0.06)',
-  text: '#1E2430',
-  textMuted: '#9AA4B5',
-  textDim: '#9AA4B5',
-  body: '#374151',
   hot: '#DC2626',
   warm: '#F59E0B',
   cold: '#64748B',
@@ -21,9 +13,8 @@ export const C = {
   hotBorder: '#FECACA',
   warmBorder: '#FDE68A',
   coldBorder: '#CBD5E1',
-  sidebarBg: '#1E2430',
-  sidebarText: 'rgba(255,255,255,0.7)',
   sidebarActive: '#D8C07A',
+  sidebarText: 'rgba(255,255,255,0.6)',
   fontHeading: "'Outfit', sans-serif",
   fontBody: "'Questrial', sans-serif",
 }
